@@ -23,6 +23,9 @@ class Agent:
                 print("Testing: I am playing as red")
             case PlayerColor.BLUE:
                 print("Testing: I am playing as blue")
+        
+        # Initialise the strategy
+        self.strategy = strategy.RandomStrategy(color, **referee)
 
     def action(self, **referee: dict) -> Action:
         """
@@ -30,10 +33,9 @@ class Agent:
         """
         match self._color:
             case PlayerColor.RED:
-                return SpawnAction(HexPos(3, 3))
+                return self.strategy.action(**referee)
             case PlayerColor.BLUE:
-                # This is going to be invalid... BLUE never spawned!
-                return SpreadAction(HexPos(3, 3), HexDir.Up)
+                return self.strategy.action(**referee)
 
     def turn(self, color: PlayerColor, action: Action, **referee: dict):
         """
