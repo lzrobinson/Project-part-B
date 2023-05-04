@@ -5,6 +5,7 @@ from referee.game import \
     PlayerColor, Action, SpawnAction, SpreadAction, HexPos, HexDir
 
 import strategy
+import agentboard
 
 # This is the entry point for your game playing agent. Currently the agent
 # simply spawns a token at the centre of the board if playing as RED, and
@@ -48,3 +49,22 @@ class Agent:
             case SpreadAction(cell, direction):
                 print(f"Testing: {color} SPREAD from {cell}, {direction}")
                 pass
+
+class OneMoveAgent(Agent):
+    """ An agent that makes a move with no look-ahead. Makes the move with the best immediate outcome.
+    Uses inheritance to inherit the action method from the Agent class.
+    """
+    def __init__(self, color: PlayerColor, **referee: dict):
+        """
+        Initialise the agent.
+        """
+        super().__init__(color, **referee)
+        
+        # Initialise the strategy
+        self.strategy = strategy.OneMoveStrategy(color, **referee)
+    
+    def action(self, **referee: dict) -> Action:
+        """
+        Return the next action to take.
+        """
+        return self.strategy.action(**referee)
