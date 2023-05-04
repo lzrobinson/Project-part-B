@@ -77,4 +77,4 @@ class OneMoveAgent(Agent):
         """
         Update the agent with the last player's action.
         """
-        return 
+        return

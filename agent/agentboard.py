@@ -94,6 +94,11 @@ class BoardState:
             case SpreadAction(cell, direction):
                 cell_power_count = 1
                 new_board = self.board.copy()
+
+                # remove the tile that is spreading
+                new_board.pop((cell.r, cell.q))
+
+                # spread in the direction of the move
                 match direction:
                     case HexDir.DownRight:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
@@ -180,7 +185,7 @@ class BoardState:
                             else:
                                 # if the tile is at max power, it will be emptied, ie. removed from the board
                                 new_board.pop((cell.r + cell_power_count, cell.q))
-                                
+
                             cell_power_count += 1
                             return new_board
                         
