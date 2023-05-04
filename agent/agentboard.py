@@ -75,12 +75,20 @@ class BoardState:
         '''Calculate the net gain/loss of a given move'''
         return self.get_board_net_score(self.get_new_boardstate(move)) - self.get_board_net_score(self.board)
     
-    def get_new_boardstate(self, move):
+    def update_boardstate(self, move, playerColour):
+        """
+        Given a move, update the boardState with the move, using get_new_boardstate
+        """
+        self.board = self.get_new_boardstate(move)
+        self.depth += 1
+
+    
+    def get_new_boardstate(self, move, playerColour):
         '''Get the new board state after a given move'''
         match move:
             case SpawnAction(cell):
                 new_board = self.board.copy()
-                new_board[(cell.r, cell.q)] = (self.agentColor, 1)
+                new_board[(cell.r, cell.q)] = (playerColour, 1)
                 return new_board
             
             case SpreadAction(cell, direction):
@@ -91,7 +99,14 @@ class BoardState:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the down right direction
                             existing_power = new_board[(cell.r, cell.q + cell_power_count)][1]
-                            new_board[(cell.r, cell.q + cell_power_count)] = (self.agentColor, existing_power + 1)
+
+                            if (existing_power < 6):
+                                new_board[(cell.r, cell.q + cell_power_count)] = (playerColour, existing_power + 1)
+
+                            else:
+                                # if the tile is at max power, it will be emptied, ie. removed from the board
+                                new_board.pop((cell.r, cell.q + cell_power_count))
+
                             cell_power_count += 1
                             return new_board
                         
@@ -99,7 +114,14 @@ class BoardState:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the down direction
                             existing_power = new_board[(cell.r - cell_power_count, cell.q + cell_power_count)][1]
-                            new_board[(cell.r - cell_power_count, cell.q + cell_power_count)] = (self.agentColor, existing_power + 1)
+
+                            if (existing_power < 6):
+                                new_board[(cell.r - cell_power_count, cell.q + cell_power_count)] = (playerColour, existing_power + 1)
+
+                            else:
+                                # if the tile is at max power, it will be emptied, ie. removed from the board
+                                new_board.pop((cell.r - cell_power_count, cell.q + cell_power_count))
+
                             cell_power_count += 1
                             return new_board
                         
@@ -107,7 +129,14 @@ class BoardState:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the down left direction
                             existing_power = new_board[(cell.r - cell_power_count, cell.q)][1]
-                            new_board[(cell.r - cell_power_count, cell.q)] = (self.agentColor, existing_power + 1)
+
+                            if (existing_power < 6):
+                                new_board[(cell.r - cell_power_count, cell.q)] = (playerColour, existing_power + 1)
+
+                            else:
+                                # if the tile is at max power, it will be emptied, ie. removed from the board
+                                new_board.pop((cell.r - cell_power_count, cell.q))
+
                             cell_power_count += 1
                             return new_board
                         
@@ -115,7 +144,13 @@ class BoardState:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the up left direction
                             existing_power = new_board[(cell.r, cell.q - cell_power_count)][1]
-                            new_board[(cell.r, cell.q - cell_power_count)] = (self.agentColor, existing_power + 1)
+
+                            if (existing_power < 6):
+                                new_board[(cell.r, cell.q - cell_power_count)] = (playerColour, existing_power + 1)
+                            else:
+                                # if the tile is at max power, it will be emptied, ie. removed from the board
+                                new_board.pop((cell.r, cell.q - cell_power_count))
+
                             cell_power_count += 1
                             return new_board
                         
@@ -123,7 +158,14 @@ class BoardState:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the up direction
                             existing_power = new_board[(cell.r + cell_power_count, cell.q - cell_power_count)][1]
-                            new_board[(cell.r + cell_power_count, cell.q - cell_power_count)] = (self.agentColor, existing_power + 1)
+
+                            if (existing_power < 6):
+                                new_board[(cell.r + cell_power_count, cell.q - cell_power_count)] = (playerColour, existing_power + 1)
+
+                            else:
+                                # if the tile is at max power, it will be emptied, ie. removed from the board
+                                new_board.pop((cell.r + cell_power_count, cell.q - cell_power_count))
+
                             cell_power_count += 1
                             return new_board
                         
@@ -131,7 +173,14 @@ class BoardState:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the up right direction
                             existing_power = new_board[(cell.r + cell_power_count, cell.q)][1]
-                            new_board[(cell.r + cell_power_count, cell.q)] = (self.agentColor, existing_power + 1)
+
+                            if (existing_power < 6):
+                                new_board[(cell.r + cell_power_count, cell.q)] = (playerColour, existing_power + 1)
+                            
+                            else:
+                                # if the tile is at max power, it will be emptied, ie. removed from the board
+                                new_board.pop((cell.r + cell_power_count, cell.q))
+                                
                             cell_power_count += 1
                             return new_board
                         

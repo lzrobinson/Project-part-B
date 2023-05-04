@@ -4,7 +4,10 @@ from referee.game import \
 
 from agent import agentboard
 
-class RandomStrategy():
+class ParentStrategy:
+    """
+    A parent class for all strategies. Note that this class is not intended to be used directly.
+    """
     def __init__(self, color: PlayerColor, **referee: dict):
         """
         Initialise the strategy.
@@ -17,13 +20,20 @@ class RandomStrategy():
         """
         pass
 
-class OneMoveStrategy():
-    def __init__(self, color: PlayerColor, **referee: dict):
+class RandomStrategy(ParentStrategy):
+    """
+    A strategy that makes a random move.
+    """
+    def action(**referee: dict) -> Action:
         """
-        Initialise the strategy.
+        Return the next action to take.
         """
-        self._color = color
-        
+        pass
+
+class OneMoveStrategy(ParentStrategy):
+    """
+    A strategy that makes a move with no look-ahead. Makes the move with the best immediate outcome.
+    """
     def action(**referee: dict) -> Action:
         """
         Return the next action to take.

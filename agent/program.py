@@ -14,6 +14,9 @@ import agentboard
 # this is not a valid strategy for actually playing the game!
 
 class Agent:
+    """
+    A parent class for all agents. Note that this class is not intended to be used directly.
+    """
     def __init__(self, color: PlayerColor, **referee: dict):
         """
         Initialise the agent.
@@ -26,6 +29,7 @@ class Agent:
                 print("Testing: I am playing as blue")
         
         # Initialise the strategy. This will be the only line you need to change for child Agents.
+        self.strategy = strategy.ParentStrategy(color, **referee)
 
         # Initialise the board
         self.board = agentboard.BoardState({}, [], 0, self._color)
@@ -35,11 +39,7 @@ class Agent:
         """
         Return the next action to take.
         """
-        match self._color:
-            case PlayerColor.RED:
-                return self.strategy.action(**referee)
-            case PlayerColor.BLUE:
-                return self.strategy.action(**referee)
+        return self.strategy.action(**referee)
 
     def turn(self, color: PlayerColor, action: Action, **referee: dict):
         """
