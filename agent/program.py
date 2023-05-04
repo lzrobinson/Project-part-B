@@ -25,8 +25,11 @@ class Agent:
             case PlayerColor.BLUE:
                 print("Testing: I am playing as blue")
         
-        # Initialise the strategy
-        self.strategy = strategy.RandomStrategy(color, **referee)
+        # Initialise the strategy. This will be the only line you need to change for child Agents.
+
+        # Initialise the board
+        self.board = agentboard.BoardState({}, [], 0, self._color)
+
 
     def action(self, **referee: dict) -> Action:
         """
@@ -51,7 +54,8 @@ class Agent:
                 pass
 
 class OneMoveAgent(Agent):
-    """ An agent that makes a move with no look-ahead. Makes the move with the best immediate outcome.
+    """ 
+    An agent that makes a move with no look-ahead. Makes the move with the best immediate outcome.
     Uses inheritance to inherit the action method from the Agent class.
     """
     def __init__(self, color: PlayerColor, **referee: dict):
@@ -59,7 +63,7 @@ class OneMoveAgent(Agent):
         Initialise the agent.
         """
         super().__init__(color, **referee)
-        
+
         # Initialise the strategy
         self.strategy = strategy.OneMoveStrategy(color, **referee)
     
@@ -68,3 +72,9 @@ class OneMoveAgent(Agent):
         Return the next action to take.
         """
         return self.strategy.action(**referee)
+    
+    def turn(self, color: PlayerColor, action: Action, **referee: dict):
+        """
+        Update the agent with the last player's action.
+        """
+        return 
