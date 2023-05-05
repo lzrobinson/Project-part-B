@@ -1,11 +1,11 @@
-from referee import Action, SpawnAction, SpreadAction, HexPos, HexDir
+from referee.game import Action, SpawnAction, SpreadAction, HexPos, HexDir, PlayerColor
 
 class BoardState:
     # a list of all coordinates on the hex board (with a range and domain of 0 to 7)
     grid_coords = [(r, q) for r in range(0, 7) for q in range(0, 7)]
 
 
-    def __init__(self, board, history, depth, agentColor):
+    def __init__(self, board: dict, history: list, depth, agentColor: PlayerColor):
         '''board is a dictionary of (r, q) coordinates and (p, k) cell states'''
         self.board = board
         self.history = history
@@ -54,7 +54,7 @@ class BoardState:
             return False
         return True
     
-    def get_total_power(board):
+    def get_total_power(self, board: dict):
         '''Get the total power of all tiles on the board'''
         total_power = 0
         for ((r, q), (player, k)) in board.items():
@@ -71,16 +71,17 @@ class BoardState:
 
         return self.get_my_power(board) - self.get_opp_power(board)
     
-    def calculate_move_impact(self, move):
+    def calculate_move_impact(self, move, playerColour):
         '''Calculate the net gain/loss of a given move'''
-        return self.get_board_net_score(self.get_new_boardstate(move)) - self.get_board_net_score(self.board)
+        return self.get_board_net_score(self.get_new_boardstate(move, playerColour)) - self.get_board_net_score(self.board)
     
     def update_boardstate(self, move, playerColour):
         """
         Given a move, update the boardState with the move, using get_new_boardstate
         """
-        self.board = self.get_new_boardstate(move)
+        self.board = self.get_new_boardstate(move, playerColour)
         self.depth += 1
+        self.update_history(move)
 
     
     def get_new_boardstate(self, move, playerColour):
@@ -103,14 +104,20 @@ class BoardState:
                     case HexDir.DownRight:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the down right direction
-                            existing_power = new_board[(cell.r, cell.q + cell_power_count)][1]
+                            x, y = (cell.r, cell.q + cell_power_count)
+                            x, y = self.wraparound_if_necessary(x, y)
+
+                            if (x, y) in new_board:
+                                existing_power = new_board[(x, y)][1]
+                            else:
+                                existing_power = 0
 
                             if (existing_power < 6):
-                                new_board[(cell.r, cell.q + cell_power_count)] = (playerColour, existing_power + 1)
+                                new_board[(x, y)] = (playerColour, existing_power + 1)
 
                             else:
                                 # if the tile is at max power, it will be emptied, ie. removed from the board
-                                new_board.pop((cell.r, cell.q + cell_power_count))
+                                new_board.pop((x, y))
 
                             cell_power_count += 1
                             return new_board
@@ -118,14 +125,20 @@ class BoardState:
                     case HexDir.Down:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the down direction
-                            existing_power = new_board[(cell.r - cell_power_count, cell.q + cell_power_count)][1]
+                            x, y = (cell.r - cell_power_count, cell.q + cell_power_count)
+                            x, y = self.wraparound_if_necessary(x, y)
+
+                            if (x, y) in new_board:
+                                existing_power = new_board[(x, y)][1]
+                            else:
+                                existing_power = 0
 
                             if (existing_power < 6):
-                                new_board[(cell.r - cell_power_count, cell.q + cell_power_count)] = (playerColour, existing_power + 1)
+                                new_board[(x, y)] = (playerColour, existing_power + 1)
 
                             else:
                                 # if the tile is at max power, it will be emptied, ie. removed from the board
-                                new_board.pop((cell.r - cell_power_count, cell.q + cell_power_count))
+                                new_board.pop((x, y))
 
                             cell_power_count += 1
                             return new_board
@@ -133,14 +146,20 @@ class BoardState:
                     case HexDir.DownLeft:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the down left direction
-                            existing_power = new_board[(cell.r - cell_power_count, cell.q)][1]
+                            x, y = (cell.r - cell_power_count, cell.q)
+                            x, y = self.wraparound_if_necessary(x, y)
+                            
+                            if (x, y) in new_board:
+                                existing_power = new_board[(x, y)][1]
+                            else:
+                                existing_power = 0
 
                             if (existing_power < 6):
-                                new_board[(cell.r - cell_power_count, cell.q)] = (playerColour, existing_power + 1)
+                                new_board[(x, y)] = (playerColour, existing_power + 1)
 
                             else:
                                 # if the tile is at max power, it will be emptied, ie. removed from the board
-                                new_board.pop((cell.r - cell_power_count, cell.q))
+                                new_board.pop((x, y))
 
                             cell_power_count += 1
                             return new_board
@@ -148,13 +167,19 @@ class BoardState:
                     case HexDir.UpLeft:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the up left direction
-                            existing_power = new_board[(cell.r, cell.q - cell_power_count)][1]
+                            x, y = (cell.r, cell.q - cell_power_count)
+                            x, y = self.wraparound_if_necessary(x, y)
+                            
+                            if (x, y) in new_board:
+                                existing_power = new_board[(x, y)][1]
+                            else:
+                                existing_power = 0
 
                             if (existing_power < 6):
-                                new_board[(cell.r, cell.q - cell_power_count)] = (playerColour, existing_power + 1)
+                                new_board[(x, y)] = (playerColour, existing_power + 1)
                             else:
                                 # if the tile is at max power, it will be emptied, ie. removed from the board
-                                new_board.pop((cell.r, cell.q - cell_power_count))
+                                new_board.pop((x, y))
 
                             cell_power_count += 1
                             return new_board
@@ -162,14 +187,20 @@ class BoardState:
                     case HexDir.Up:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the up direction
-                            existing_power = new_board[(cell.r + cell_power_count, cell.q - cell_power_count)][1]
+                            x, y = (cell.r + cell_power_count, cell.q - cell_power_count)
+                            x, y = self.wraparound_if_necessary(x, y)
+                            
+                            if (x, y) in new_board:
+                                existing_power = new_board[(x, y)][1]
+                            else:
+                                existing_power = 0
 
                             if (existing_power < 6):
-                                new_board[(cell.r + cell_power_count, cell.q - cell_power_count)] = (playerColour, existing_power + 1)
+                                new_board[(x, y)] = (playerColour, existing_power + 1)
 
                             else:
                                 # if the tile is at max power, it will be emptied, ie. removed from the board
-                                new_board.pop((cell.r + cell_power_count, cell.q - cell_power_count))
+                                new_board.pop((x, y))
 
                             cell_power_count += 1
                             return new_board
@@ -177,14 +208,20 @@ class BoardState:
                     case HexDir.UpRight:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the up right direction
-                            existing_power = new_board[(cell.r + cell_power_count, cell.q)][1]
+                            x, y = (cell.r + cell_power_count, cell.q)
+                            x, y = self.wraparound_if_necessary(x, y)
+                            
+                            if (x, y) in new_board:
+                                existing_power = new_board[(x, y)][1]
+                            else:
+                                existing_power = 0
 
                             if (existing_power < 6):
-                                new_board[(cell.r + cell_power_count, cell.q)] = (playerColour, existing_power + 1)
+                                new_board[(x, y)] = (playerColour, existing_power + 1)
                             
                             else:
                                 # if the tile is at max power, it will be emptied, ie. removed from the board
-                                new_board.pop((cell.r + cell_power_count, cell.q))
+                                new_board.pop((x, y))
 
                             cell_power_count += 1
                             return new_board
@@ -282,6 +319,15 @@ class BoardState:
                 my_power += k
         return my_power
     
+    def get_opp_power(self, board):
+        '''Get the combined power of all opponent tiles on the board
+        This also requires a board parameter as often it is used for potential boards, and not the present board'''
+        opp_power = 0
+        for ((r, q), (player, k)) in board.items():
+            if player != self.agentColor:
+                opp_power += k
+        return opp_power
+    
     def get_my_tiles(self):
         '''Gets all the player tiles on the given board'''
         my_tiles = []
@@ -315,6 +361,16 @@ class BoardState:
                 if self.tiles_are_adjacent(r1, q1, r2, q2):
                     return True
         return False
+    
+    def get_highest_opp_tile_adjacent(self, board, my_tile: HexPos):
+        '''Get the highest power opp tile that is adjacent to the given tile (of type Hex)'''
+        highest_power = 0
+        for ((r, q), (player, k)) in board.items():
+            if player != self.agentColor:
+                if self.tiles_are_adjacent(my_tile.r, my_tile.q, r, q):
+                    if k > highest_power:
+                        highest_power = k
+        return highest_power
 
     def red_power_higher_than_parent(self):
         '''Determine if the red power of this boardstate is higher than the red power of the parent state'''
@@ -323,3 +379,15 @@ class BoardState:
         if this_boardstate_red_power > parent_boardstate_red_power:
             return True
         return False
+    
+    def wraparound_if_necessary(self, r, q):
+        '''Wraparound the given r and q values if they are out of bounds'''
+        if r < 0:
+            r += 7
+        elif r >= 7:
+            r -= 7
+        if q < 0:
+            q += 7
+        elif q >= 7:
+            q -= 7
+        return r, q

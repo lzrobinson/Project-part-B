@@ -4,8 +4,9 @@
 from referee.game import \
     PlayerColor, Action, SpawnAction, SpreadAction, HexPos, HexDir
 
-import strategy
-import agentboard
+from .agentboard import BoardState
+from .strategy import ParentStrategy, OneMoveStrategy
+
 
 # This is the entry point for your game playing agent. Currently the agent
 # simply spawns a token at the centre of the board if playing as RED, and
@@ -29,30 +30,26 @@ class Agent:
                 print("Testing: I am playing as blue")
         
         # Initialise the strategy. This will be the only line you need to change for child Agents.
-        self.strategy = strategy.ParentStrategy(color, **referee)
+        self.strategy = ParentStrategy(color, **referee)
 
         # Initialise the board
-        self.board = agentboard.BoardState({}, [], 0, self._color)
+        self.board = BoardState({}, [], 0, self._color)
 
 
     def action(self, **referee: dict) -> Action:
         """
         Return the next action to take.
         """
-        return self.strategy.action(**referee)
+        return self.strategy.action(self.board, **referee)
 
     def turn(self, color: PlayerColor, action: Action, **referee: dict):
         """
         Update the agent with the last player's action.
         """
-        match action:
-            case SpawnAction(cell):
-                print(f"Testing: {color} SPAWN at {cell}")
-                pass
-            case SpreadAction(cell, direction):
-                print(f"Testing: {color} SPREAD from {cell}, {direction}")
-                pass
+        self.board.update_boardstate(action, color)
 
+# for some reason, this attribute is not found when running the referee.
+# Potentially, this is due to the class being a child of the Agent class.
 class OneMoveAgent(Agent):
     """ 
     An agent that makes a move with no look-ahead. Makes the move with the best immediate outcome.
@@ -65,16 +62,10 @@ class OneMoveAgent(Agent):
         super().__init__(color, **referee)
 
         # Initialise the strategy
-        self.strategy = strategy.OneMoveStrategy(color, **referee)
+        self.strategy = OneMoveStrategy(color, **referee)
     
     def action(self, **referee: dict) -> Action:
         """
         Return the next action to take.
         """
-        return self.strategy.action(**referee)
-    
-    def turn(self, color: PlayerColor, action: Action, **referee: dict):
-        """
-        Update the agent with the last player's action.
-        """
-        return
+        return self.strategy.action(self.board, **referee)
