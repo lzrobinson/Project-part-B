@@ -23,14 +23,9 @@ class Agent:
         Initialise the agent.
         """
         self._color = color
-        match color:
-            case PlayerColor.RED:
-                print("Testing: I am playing as red")
-            case PlayerColor.BLUE:
-                print("Testing: I am playing as blue")
         
         # Initialise the strategy. This will be the only line you need to change for child Agents.
-        self.strategy = ParentStrategy(color, **referee)
+        self.strategy = TwoMoveStrategy(color, **referee)
 
         # Initialise the board
         self.board = BoardState({}, [], 0, self._color)
