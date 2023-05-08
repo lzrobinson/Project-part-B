@@ -14,12 +14,15 @@ class BoardState:
         # The set of visited states is only stored in the root node. Note that 'visited' states means a node that has had its children generated
         self.visited_states = set()
 
+    def copy(self):
+        '''Return a copy of the current board state'''
+        return BoardState(self.board.copy(), self.history.copy(), self.depth, self.agentColor)
 
-    def get_spreadmoves(self):
+    def get_spreadmoves(self, myColor: PlayerColor):
         '''Return a list of all possible spreadmoves from the current board state'''
         spreadmoves = []
         for ((x, y), (player, k)) in self.board.items():
-            if (player == self.agentColor):
+            if (player == myColor):
                 spreadmoves += self.generate_spreadmoves(x, y)
         return spreadmoves
     
@@ -69,12 +72,22 @@ class BoardState:
         '''get the net score of a given board. This is the difference between the player power and opponent power
         Note that a board parameter is required as this function may be used to calculate the net score of a potential board, and not always the present board'''
 
-        return self.get_my_power(board) - self.get_opp_power(board)
+        return self.get_my_power(board) - self.get_opp_power(self.agentColor, board)
     
     def calculate_move_impact(self, move, playerColour):
         '''Calculate the net gain/loss of a given move'''
         return self.get_board_net_score(self.get_new_boardstate(move, playerColour)) - self.get_board_net_score(self.board)
     
+    def calculate_move_opp_impact(self, move, myColour):
+        '''Calculate the net gain/loss opponent power of a given move'''
+        return self.get_opp_power(myColour, self.get_new_boardstate(move, myColour)) - self.get_opp_power(myColour, self.board)
+    
+    def check_if_win(self, myColor, board):
+        '''Check if the given board is a winning board'''
+        if self.get_opp_power(myColor, board) == 0:
+            return True
+        return False
+
     def update_boardstate(self, move, playerColour):
         """
         Given a move, update the boardState with the move, using get_new_boardstate
@@ -95,8 +108,6 @@ class BoardState:
             case SpreadAction(cell, direction):
                 cell_power_count = 1
                 new_board = self.board.copy()
-
-                # remove the tile that is spreading
                 new_board.pop((cell.r, cell.q))
 
                 # spread in the direction of the move
@@ -120,7 +131,7 @@ class BoardState:
                                 new_board.pop((x, y))
 
                             cell_power_count += 1
-                            return new_board
+                        return new_board
                         
                     case HexDir.Down:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
@@ -141,7 +152,7 @@ class BoardState:
                                 new_board.pop((x, y))
 
                             cell_power_count += 1
-                            return new_board
+                        return new_board
                         
                     case HexDir.DownLeft:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
@@ -162,18 +173,19 @@ class BoardState:
                                 new_board.pop((x, y))
 
                             cell_power_count += 1
-                            return new_board
+                        return new_board
                         
                     case HexDir.UpLeft:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
                             # place a new tile in the up left direction
                             x, y = (cell.r, cell.q - cell_power_count)
                             x, y = self.wraparound_if_necessary(x, y)
-                            
+
                             if (x, y) in new_board:
                                 existing_power = new_board[(x, y)][1]
                             else:
                                 existing_power = 0
+
 
                             if (existing_power < 6):
                                 new_board[(x, y)] = (playerColour, existing_power + 1)
@@ -182,7 +194,7 @@ class BoardState:
                                 new_board.pop((x, y))
 
                             cell_power_count += 1
-                            return new_board
+                        return new_board
                         
                     case HexDir.Up:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
@@ -203,7 +215,7 @@ class BoardState:
                                 new_board.pop((x, y))
 
                             cell_power_count += 1
-                            return new_board
+                        return new_board
                         
                     case HexDir.UpRight:
                         while cell_power_count <= self.board[(cell.r, cell.q)][1]:
@@ -224,7 +236,7 @@ class BoardState:
                                 new_board.pop((x, y))
 
                             cell_power_count += 1
-                            return new_board
+                        return new_board
                         
 
     def simple_heuristic(self):
@@ -319,12 +331,12 @@ class BoardState:
                 my_power += k
         return my_power
     
-    def get_opp_power(self, board):
+    def get_opp_power(self, myColor, board):
         '''Get the combined power of all opponent tiles on the board
         This also requires a board parameter as often it is used for potential boards, and not the present board'''
         opp_power = 0
         for ((r, q), (player, k)) in board.items():
-            if player != self.agentColor:
+            if player != myColor:
                 opp_power += k
         return opp_power
     
@@ -362,11 +374,11 @@ class BoardState:
                     return True
         return False
     
-    def get_highest_opp_tile_adjacent(self, board, my_tile: HexPos):
+    def get_highest_opp_tile_adjacent(self, board, myColour, my_tile: HexPos):
         '''Get the highest power opp tile that is adjacent to the given tile (of type Hex)'''
         highest_power = 0
         for ((r, q), (player, k)) in board.items():
-            if player != self.agentColor:
+            if player != myColour:
                 if self.tiles_are_adjacent(my_tile.r, my_tile.q, r, q):
                     if k > highest_power:
                         highest_power = k

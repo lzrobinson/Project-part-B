@@ -5,7 +5,7 @@ from referee.game import \
     PlayerColor, Action, SpawnAction, SpreadAction, HexPos, HexDir
 
 from .agentboard import BoardState
-from .strategy import ParentStrategy, OneMoveStrategy
+from .strategy import ParentStrategy, OneMoveStrategy2, TwoMoveStrategy
 
 
 # This is the entry point for your game playing agent. Currently the agent
@@ -40,7 +40,8 @@ class Agent:
         """
         Return the next action to take.
         """
-        return self.strategy.action(self.board, **referee)
+        action = self.strategy.action(self.board, **referee)
+        return action
 
     def turn(self, color: PlayerColor, action: Action, **referee: dict):
         """
@@ -62,10 +63,18 @@ class OneMoveAgent(Agent):
         super().__init__(color, **referee)
 
         # Initialise the strategy
-        self.strategy = OneMoveStrategy(color, **referee)
-    
-    def action(self, **referee: dict) -> Action:
+        self.strategy = OneMoveStrategy2(color, **referee)
+
+class TwoMoveAgent(Agent):
+    """ 
+    An agent that makes a move with look-ahead of 2. Makes the move with the best outcome after 2 moves.
+    Uses inheritance to inherit the action method from the Agent class.
+    """
+    def __init__(self, color: PlayerColor, **referee: dict):
         """
-        Return the next action to take.
+        Initialise the agent.
         """
-        return self.strategy.action(self.board, **referee)
+        super().__init__(color, **referee)
+
+        # Initialise the strategy
+        self.strategy = TwoMoveStrategy(color, **referee)
