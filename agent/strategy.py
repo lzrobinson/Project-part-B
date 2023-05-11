@@ -4,6 +4,9 @@ from referee.game import \
 
 from .agentboard import BoardState
 
+import random
+import time
+
 class ParentStrategy:
     """
     A parent class for all strategies. Note that this class is not intended to be used directly.
@@ -211,3 +214,27 @@ class TwoMoveStrategy(ParentStrategy):
         
         return best_move
     
+class RandomStrategy(ParentStrategy):
+    """
+    A random strategy that makes a move with no look-ahead. 
+    Randomly chooses to either place a tile or take a spread action.
+    """
+    def action(self, boardSt: BoardState, **referee: dict) -> Action:
+        """
+        Return the next action to take.
+        """
+
+        # If it's the first turn, place a random tile. 
+        if boardSt.get_total_power(boardSt.board) <= 1:
+            coords_to_potentially_spawn_a_tile = boardSt.get_spawnmoves()
+            return random.choice(coords_to_potentially_spawn_a_tile)
+        
+        # If the total board power <= 48, randomly choose to either place a tile or take a spread action.
+        elif boardSt.get_total_power(boardSt.board) <= 48:
+            if random.randint(0,1) == 0:
+                coords_to_potentially_spawn_a_tile = boardSt.get_spawnmoves()
+                return random.choice(coords_to_potentially_spawn_a_tile)
+            else:
+                potential_spreadmoves = boardSt.get_spreadmoves(self._color)
+                # print(f"potential_spreadmoves: {potential_spreadmoves}")
+                return random.choice(potential_spreadmoves)

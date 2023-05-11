@@ -4,8 +4,8 @@
 from referee.game import \
     PlayerColor, Action, SpawnAction, SpreadAction, HexPos, HexDir
 
-from .agentboard import BoardState
-from .strategy import ParentStrategy, OneMoveStrategy2, TwoMoveStrategy, RandomStrategy
+from agent.agentboard import BoardState
+from agent.strategy import ParentStrategy, OneMoveStrategy2, TwoMoveStrategy, RandomStrategy
 
 
 # This is the entry point for your game playing agent. Currently the agent
@@ -25,7 +25,7 @@ class Agent:
         self._color = color
         
         # Initialise the strategy. This will be the only line you need to change for child Agents.
-        self.strategy = TwoMoveStrategy(color, **referee)
+        self.strategy = RandomStrategy(color, **referee)
 
         # Initialise the board
         self.board = BoardState({}, [], 0, self._color)
@@ -43,36 +43,6 @@ class Agent:
         Update the agent with the last player's action.
         """
         self.board.update_boardstate(action, color)
-
-# for some reason, this attribute is not found when running the referee.
-# Potentially, this is due to the class being a child of the Agent class.
-class OneMoveAgent(Agent):
-    """ 
-    An agent that makes a move with no look-ahead. Makes the move with the best immediate outcome.
-    Uses inheritance to inherit the action method from the Agent class.
-    """
-    def __init__(self, color: PlayerColor, **referee: dict):
-        """
-        Initialise the agent.
-        """
-        super().__init__(color, **referee)
-
-        # Initialise the strategy
-        self.strategy = OneMoveStrategy2(color, **referee)
-
-class TwoMoveAgent(Agent):
-    """ 
-    An agent that makes a move with look-ahead of 2. Makes the move with the best outcome after 2 moves.
-    Uses inheritance to inherit the action method from the Agent class.
-    """
-    def __init__(self, color: PlayerColor, **referee: dict):
-        """
-        Initialise the agent.
-        """
-        super().__init__(color, **referee)
-
-        # Initialise the strategy
-        self.strategy = TwoMoveStrategy(color, **referee)
 
 class RandomAgent(Agent):
     """ 
