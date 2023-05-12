@@ -6,6 +6,9 @@ from .agentboard import BoardState
 
 import random
 import time
+import math
+
+TIME_TURN_CONSTANT = 180/(343/2) # 180 seconds for 343/2 turns, used to calculate time per turn
 
 class ParentStrategy:
     """
@@ -17,16 +20,6 @@ class ParentStrategy:
         """
         self._color = color
         
-    def action(self, board: BoardState, **referee: dict) -> Action:
-        """
-        Return the next action to take.
-        """
-        pass
-
-class RandomStrategy(ParentStrategy):
-    """
-    A strategy that makes a random move.
-    """
     def action(self, board: BoardState, **referee: dict) -> Action:
         """
         Return the next action to take.
@@ -238,3 +231,161 @@ class RandomStrategy(ParentStrategy):
                 potential_spreadmoves = boardSt.get_spreadmoves(self._color)
                 # print(f"potential_spreadmoves: {potential_spreadmoves}")
                 return random.choice(potential_spreadmoves)
+            
+class MonteCarloStrategy(ParentStrategy):
+    """
+    Strategy that uses Monte Carlo Tree Search to determine next move.
+    """
+    def action(self, boardSt: BoardState, **referee: dict) -> Action:
+        """
+        Return the next action to take.
+        """
+        # Create a new MonteCarloTree object.
+        tree = MonteCarloTree(boardSt, self._color, **referee)
+        # Run the Monte Carlo Tree Search algorithm.
+        while referee['time_left']() < 343 - (boardSt.depth * TIME_TURN_CONSTANT):
+            tree.run()
+        # Return the best move.
+        return tree.get_best_move()
+
+class MonteCarloTree:
+    """
+    A Monte Carlo Tree Search algorithm to find the best move to make.
+    """
+    def __init__(self, boardSt, color, **referee):
+        """
+        Initialize the MonteCarloTree object.
+        """
+        self.boardSt = boardSt
+        self.color = color
+        self.referee = referee
+        self.root = Node(boardSt, color, None, None)
+        self.root.expand()
+        self.best_move = None
+
+    def run(self):
+        """
+        Run the Monte Carlo Tree Search algorithm.
+        """
+        # Select a node to expand.
+        node = self.select_node(self.root)
+        # Expand the node.
+        node.expand()
+        # Simulate a game from the expanded node.
+        result = self.simulate(node)
+        # Backpropagate the result of the simulated game.
+        self.backpropagate(node, result)
+    
+    def select_node(self, node):
+        """
+        Select a node to expand.
+        """
+        # If the node is a leaf node, return it.
+        if node.is_leaf():
+            return node
+        # If the node is not a leaf node, select a child node to expand.
+        else:
+            return self.select_node(self.best_child(node))
+    
+    def simulate(self, node):
+        """
+        Simulate a game from the expanded node.
+        """
+        # Create a copy of the boardstate.
+        boardSt = node.boardSt.copy()
+        # While the game is not over, make a random move.
+        while not boardSt.check_if_win(self.color, boardSt.board):
+            if boardSt.get_total_power(boardSt.board) <= 1:
+                coords_to_potentially_spawn_a_tile = boardSt.get_spawnmoves()
+                boardSt.board = boardSt.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
+            else:
+                potential_spreadmoves = boardSt.get_spreadmoves(self.color)
+                boardSt.board = boardSt.get_new_boardstate(random.choice(potential_spreadmoves), self.color)
+            boardSt.depth += 1
+        # Return the result of the game.
+        return boardSt.check_if_win(self.color, boardSt.board)
+    
+    def backpropagate(self, node, result):
+        """
+        Backpropagate the result of the simulated game.
+        """
+        # If the node is not the root node, update the node's win and visit counts.
+        if node.parent is not None:
+            node.update(result)
+            self.backpropagate(node.parent, result)
+    
+class Node:
+    """
+    A node in the Monte Carlo Tree Search algorithm.
+    """
+    def __init__(self, boardSt, color, parent, action):
+        """
+        Initialize the Node object.
+        """
+        self.boardSt = boardSt
+        self.color = color
+        self.parent = parent
+        self.action = action
+        self.children = []
+        self.wins = 0
+        self.visits = 0
+    
+    def expand(self):
+        """
+        Expand the node.
+        """
+        # If the node is a leaf node, expand it.
+        if self.is_leaf():
+            # If the node is not the root node, make a random move.
+            if self.parent is not None:
+                if self.boardSt.get_total_power(self.boardSt.board) <= 1:
+                    coords_to_potentially_spawn_a_tile = self.boardSt.get_spawnmoves()
+                    self.boardSt.board = self.boardSt.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
+                else:
+                    potential_spreadmoves = self.boardSt.get_spreadmoves(self.color)
+                    self.boardSt.board = self.boardSt.get_new_boardstate(random.choice(potential_spreadmoves), self.color)
+                self.boardSt.depth += 1
+            # Create a child node for each possible move.
+            for action in self.boardSt.get_spawnmoves():
+                self.children.append(Node(self.boardSt, self.color, self, action))
+            for action in self.boardSt.get_spreadmoves(self.color):
+                self.children.append(Node(self.boardSt, self.color, self, action))
+        # If the node is not a leaf node, do nothing.
+        else:
+            pass
+    
+    def is_leaf(self):
+        """
+        Return True if the node is a leaf node, False otherwise.
+        """
+        return len(self.children) == 0
+    
+    def update(self, result):
+        """
+        Update the node's win and visit counts.
+        """
+        self.visits += 1
+        self.wins += result
+    
+    def get_ucb(self):
+        """
+        Return the node's UCB1 value.
+        """
+        return self.wins / self.visits + 1.414 * math.sqrt(math.log(self.parent.visits) / self.visits)
+    
+    def get_best_child(self):
+        """
+        Return the node's best child node.
+        """
+        # Initialize the best child node.
+        best_child = None
+        # Iterate through the node's children.
+        for child in self.children:
+            # If the child node is the best child node, update the best child node.
+            if best_child is None or child.get_ucb() > best_child.get_ucb():
+                best_child = child
+        # Return the best child node.
+        return best_child
+    
+
+    
