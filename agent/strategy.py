@@ -5,7 +5,6 @@ from referee.game import \
 from .agentboard import BoardState
 
 import random
-import time
 
 class ParentStrategy:
     """
@@ -238,3 +237,14 @@ class RandomStrategy(ParentStrategy):
                 potential_spreadmoves = boardSt.get_spreadmoves(self._color)
                 # print(f"potential_spreadmoves: {potential_spreadmoves}")
                 return random.choice(potential_spreadmoves)
+            
+class AlphaBetaStrategy(ParentStrategy):
+    """
+    A strategy that uses alpha-beta pruning to look ahead 2 turns. 
+    """
+    def action(self, boardSt: BoardState, **referee: dict) -> Action:
+        """
+        Return the next action to take.
+        """
+
+        
