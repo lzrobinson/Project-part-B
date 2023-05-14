@@ -112,7 +112,7 @@ class TwoMoveStrategy(ParentStrategy):
     Strategy that makes a move with one look-ahead. Makes the move with the best outcome after the next move.
     Predicts opponent's move using OneMoveStrategy.
     """
-    def action(self, boardSt: BoardState, **referee: dict) -> Action:
+    def action(self, boardSt: BoardState) -> Action:
         """
         Return the next action to take.
         """
@@ -141,7 +141,7 @@ class TwoMoveStrategy(ParentStrategy):
                 return spread
             
             # Predict opponent's move and calculate the net gain of the opponent's move.
-            opp_move = opp_strategy.action(copyBoard, **referee)
+            opp_move = opp_strategy.action(copyBoard)
             running_gain += copyBoard.calculate_move_impact(opp_move, self._color.opponent)
             copyBoard.board = copyBoard.get_new_boardstate(opp_move, self._color.opponent)
 
@@ -154,7 +154,7 @@ class TwoMoveStrategy(ParentStrategy):
                 continue
 
             # Then, find the spread move with the highest gain after the opponent's move.
-            next_move = next_turn_strategy.action(copyBoard, **referee)
+            next_move = next_turn_strategy.action(copyBoard)
             running_gain += copyBoard.calculate_move_impact(next_move, self._color)
             copyBoard.board = copyBoard.get_new_boardstate(next_move, self._color)
 
@@ -177,26 +177,148 @@ class TwoMoveStrategy(ParentStrategy):
                 running_gain = 1
 
                 # Predict opponent's move and calculate the net gain of the opponent's move.
-                opp_move = opp_strategy.action(copyBoard, **referee)
+                opp_move = opp_strategy.action(copyBoard)
                 running_gain += copyBoard.calculate_move_impact(opp_move, self._color.opponent)
                 copyBoard.board = copyBoard.get_new_boardstate(opp_move, self._color.opponent)
-
-                # delete this
-                opp_copyBoard = copyBoard.board
                 
                 # Ensure that we aren't trying to play from a game that has already been lost.
                 if (copyBoard.check_if_win(self._color.opponent, copyBoard.board)):
                     continue
 
-                # Then, find the spread move with the highest gain after the opponent's move.
-                next_move = next_turn_strategy.action(copyBoard, **referee)
+                # Then, find the move with the highest gain after the opponent's move.
+                next_move = next_turn_strategy.action(copyBoard)
                 running_gain += copyBoard.calculate_move_impact(next_move, self._color)
                 copyBoard.board = copyBoard.get_new_boardstate(next_move, self._color)
                 
                 if running_gain > best_gain:
                     best_move = spawn
                     best_gain = running_gain
+                elif best_move is None:
+                    best_move = spawn
+                    best_gain = running_gain
+
+        if best_move is None:
+            return last_resort
+        
+        return best_move
+    
+class ThreeMoveStrategy(ParentStrategy):
+    """
+    Strategy that makes a move with two look-ahead. Makes the move with the best outcome after the next two moves.
+    Predicts the opponent's move with TwoMoveStrategy.
+    """
+    def action(self, boardSt: BoardState, **referee: dict) -> Action:
+        """
+        Return the next action to take.
+        """
+        # ThreeMoveStrategy prioritises spread moves, choosing the spreadmove with the highest net gain.
+        best_move = None
+        best_gain = 0
+        running_gain = 0
+        best_opp_move = None
+
+        # Create a new TwoMoveStrategy object to predict opponent's move.
+        opp_strategy = TwoMoveStrategy(self._color.opponent)
+
+        # Create a new TwoMoveStrategy object to find the best move after the opponent's predicted move.
+        next_turn_strategy = TwoMoveStrategy(self._color)
+        final_turn_strategy = OneMoveStrategy(self._color)
+
+        # Iterate through all possible moves. Find the move with the highest net gain after the opponent's move.
+        for spread in boardSt.get_spreadmoves(self._color):
+            # Create a copy of the boardstate and calculate the net gain of the spread move.
+
+            copyBoard = boardSt.copy()
+            running_gain = copyBoard.calculate_move_impact(spread, self._color)
+            copyBoard.board = copyBoard.get_new_boardstate(spread, self._color)
+
+            # Check if spread move results in winning the game.
+            if (copyBoard.check_if_win(self._color, copyBoard.board)):
+                return spread
+            
+            # Predict opponent's move and calculate the net gain of the opponent's move.
+            opp_move = opp_strategy.action(copyBoard)
+            running_gain += copyBoard.calculate_move_impact(opp_move, self._color.opponent)
+            copyBoard.board = copyBoard.get_new_boardstate(opp_move, self._color.opponent)
+
+            # Ensure that we aren't trying to play from a game that has already been lost.
+            # However, if the only possible move is a losing move, we will play it.
+            # This 'last resort' case in is in the specific instance that a spawn move is not possible, 
+            # and the only spread move possible is a losing move.
+            if (copyBoard.check_if_win(self._color.opponent, copyBoard.board)):
+                last_resort = spread
+                continue
+
+            # Then, find the spread move with the highest gain after the opponent's move.
+            next_move = next_turn_strategy.action(copyBoard)
+            running_gain += copyBoard.calculate_move_impact(next_move, self._color)
+            copyBoard.board
+
+            # Then predict the opponent's next move.
+            opp_move = opp_strategy.action(copyBoard)
+            running_gain += copyBoard.calculate_move_impact(opp_move, self._color.opponent)
+            copyBoard.board = copyBoard.get_new_boardstate(opp_move, self._color.opponent)
+
+            # Ensure that we aren't trying to play from a game that has already been lost.
+            if (copyBoard.check_if_win(self._color.opponent, copyBoard.board)):
+                continue
+
+            # Then, find the move with the highest gain after the opponent's move.
+            final_move = final_turn_strategy.action(copyBoard)
+            running_gain += copyBoard.calculate_move_impact(final_move, self._color)
+            copyBoard.board = copyBoard.get_new_boardstate(final_move, self._color)
+
+            if running_gain > best_gain:
+                best_move = spread
+                best_gain = running_gain
+                best_opp_move = opp_move
+
+            elif best_move is None:
+                best_move = spread
+                best_gain = running_gain
+                best_opp_move = opp_move
+
+        # If the  total board power < 48, iterate through possible spawn moves to see if there is a spawn move that will result in the highest net gain after the opponent's move.
+        if boardSt.get_total_power(boardSt.board) < 48:
+            for spawn in boardSt.get_spawnmoves():
+                # Create a copy of the boardstate.
+                copyBoard = boardSt.copy()
+                running_gain = 1
+                copyBoard.board = copyBoard.get_new_boardstate(spawn, self._color)
+
+                # Predict opponent's move and calculate the net gain of the opponent's move.
+                opp_move = opp_strategy.action(copyBoard)
+                running_gain += copyBoard.calculate_move_impact(opp_move, self._color.opponent)
+                copyBoard.board = copyBoard.get_new_boardstate(opp_move, self._color.opponent)
+
+                # Ensure that we aren't trying to play from a game that has already been lost.
+                if (copyBoard.check_if_win(self._color.opponent, copyBoard.board)):
+                    continue
+
+                # Then, find the move with the highest gain after the opponent's move.
+                next_move = next_turn_strategy.action(copyBoard)
+                running_gain += copyBoard.calculate_move_impact(next_move, self._color)
+                copyBoard.board = copyBoard.get_new_boardstate(next_move, self._color)
+
+                # Then predict the opponent's next move.
+                opp_move = opp_strategy.action(copyBoard)
+                running_gain += copyBoard.calculate_move_impact(opp_move, self._color.opponent)
+                copyBoard.board = copyBoard.get_new_boardstate(opp_move, self._color.opponent)
+
+                # Ensure that we aren't trying to play from a game that has already been lost.
+                if (copyBoard.check_if_win(self._color.opponent, copyBoard.board)):
+                    continue
+
+                # Then, find the move with the highest gain after the opponent's move.
+                final_move = final_turn_strategy.action(copyBoard)
+                running_gain += copyBoard.calculate_move_impact(final_move, self._color)
+                copyBoard.board = copyBoard.get_new_boardstate(final_move, self._color)
+
+                if running_gain > best_gain:
+                    best_move = spawn
+                    best_gain = running_gain
                     best_opp_move = opp_move
+
                 elif best_move is None:
                     best_move = spawn
                     best_gain = running_gain
@@ -206,6 +328,10 @@ class TwoMoveStrategy(ParentStrategy):
             return last_resort
         
         return best_move
+
+
+
+        
     
 class RandomStrategy(ParentStrategy):
     """
@@ -249,7 +375,7 @@ class MonteCarloStrategy(ParentStrategy):
         # Create a new MonteCarloTree object.
         start_time = time.time()
         copyBoard = boardSt.copy()
-        tree = MonteCarloTree(copyBoard, self._color, **referee)
+        tree = MonteCarloTree2(copyBoard, self._color, **referee)
         # Run the Monte Carlo Tree Search algorithm.
         # Keep running the tree until the allocated time for the turn is up
         while time.time() - start_time < TIME_TURN_CONSTANT:
@@ -350,25 +476,24 @@ class MonteCarloTree:
             copyBoard.depth += 1
             turncount += 1
 
-        net_diff = node.boardSt.get_opp_power(self.color, copyBoard.board) - copyBoard.get_opp_power(self.color, copyBoard.board)
+        net_diff = node.boardSt.get_opp_power(self.color, node.boardSt.board) - copyBoard.get_opp_power(self.color, copyBoard.board)
 
         # Return the result of the game, or if end state not reached, return the result of the heuristic.
         if copyBoard.check_if_win(self.color, copyBoard.board):
-            #print("win")
-            return 1/copyBoard.depth
+            return net_diff/copyBoard.depth
 
         # If the opposition power is less than the root board
         elif net_diff > 0:
             #print("win")
             return net_diff/(copyBoard.depth**2)
 
-        elif copyBoard.get_my_power(copyBoard.board) == copyBoard.get_opp_power(self.color, copyBoard.board):
+        elif net_diff == 0:
             #print("tie")
             return 0
 
         else:
             #print("loss")
-            return -1/(copyBoard.depth**0.5)
+            return net_diff/(copyBoard.depth**2)
     
     def get_best_move(self):
         """
@@ -481,7 +606,7 @@ class Node:
         # Iterate through the node's children.
         for child in self.children:
             # If the child node is the best child node, update the best child node.
-            if best_child is None or child.get_ucb2() > best_child.get_ucb2():
+            if best_child is None or child.get_ucb() > best_child.get_ucb():
                 best_child = child
         # Return the best child node.
         return best_child
@@ -518,20 +643,37 @@ class MonteCarloTree2(MonteCarloTree):
 
         # While the game is not over, make a random move.
         turncount = 0
-        while not copyBoard.check_if_win(self.color, copyBoard.board) and not copyBoard.check_if_loss(self.color, copyBoard.board) and copyBoard.depth < 170 or turncount == 0:
+        while not copyBoard.check_if_win(self.color, copyBoard.board) and not copyBoard.check_if_loss(self.color, copyBoard.board) and copyBoard.depth < 10 or turncount == 0:
             # Rotate between player's turn and opponent's turn.
             if turncount % 2 == 0:
-                copyBoard.board = copyBoard.get_new_boardstate(player_sim.action(copyBoard), self.color)
+                if copyBoard.get_my_power(copyBoard.board) < 1:
+                    coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
+                    copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
+                else:
+                    if (random.randint(0,2) == 0) and (copyBoard.get_total_power(copyBoard.board) < 48):
+                        coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
+                        copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
+                    else:
+                        potential_spreadmoves = copyBoard.get_spreadmoves(self.color)
+                        copyBoard.board = copyBoard.get_new_boardstate(random.choice(potential_spreadmoves), self.color)
             # Opponent's turn.
             else:
                 copyBoard.board = copyBoard.get_new_boardstate(opponent_sim.action(copyBoard), self.color.opponent)
             copyBoard.depth += 1
             turncount += 1
 
+        net_diff = node.boardSt.get_opp_power(self.color, node.boardSt.board) - copyBoard.get_opp_power(self.color, copyBoard.board)
+
         # Return the result of the game, or if end state not reached, return the result of the heuristic.
-        if copyBoard.check_if_win(self.color, copyBoard.board):# or copyBoard.get_my_power(copyBoard.board) > copyBoard.get_opp_power(self.color, copyBoard.board):
+        if copyBoard.check_if_win(self.color, copyBoard.board):
+            print(f"win {node.action.__str__()} {net_diff}")
+            return net_diff/copyBoard.depth
+
+        # If the opposition power is less than the root board
+        elif net_diff >= 0:
             #print("win")
-            return True
+            return net_diff/(copyBoard.depth)
+
         else:
             #print("loss")
-            return False
+            return net_diff/(copyBoard.depth)

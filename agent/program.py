@@ -25,7 +25,7 @@ class Agent:
         self._color = color
         
         # Initialise the strategy. This will be the only line you need to change for child Agents.
-        self.strategy = OneMoveStrategy2(color)
+        self.strategy = TwoMoveStrategy(color)
 
         # Initialise the board
         self.board = BoardState({}, [], 0, self._color)
