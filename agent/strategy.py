@@ -222,8 +222,8 @@ class RandomStrategy(ParentStrategy):
             coords_to_potentially_spawn_a_tile = boardSt.get_spawnmoves()
             return random.choice(coords_to_potentially_spawn_a_tile)
         
-        # If the total board power <= 48, randomly choose to either place a tile or take a spread action.
-        elif boardSt.get_total_power(boardSt.board) <= 48:
+        # If the total board power < 48, randomly choose to either place a tile or take a spread action.
+        elif boardSt.get_total_power(boardSt.board) < 48:
             if random.randint(0,1) == 0:
                 coords_to_potentially_spawn_a_tile = boardSt.get_spawnmoves()
                 return random.choice(coords_to_potentially_spawn_a_tile)
@@ -231,7 +231,13 @@ class RandomStrategy(ParentStrategy):
                 potential_spreadmoves = boardSt.get_spreadmoves(self._color)
                 # print(f"potential_spreadmoves: {potential_spreadmoves}")
                 return random.choice(potential_spreadmoves)
-            
+        
+        # If the total board power >= 48, take a spread action.
+        else:
+            potential_spreadmoves = boardSt.get_spreadmoves(self._color)
+            # print(f"potential_spreadmoves: {potential_spreadmoves}")
+            return random.choice(potential_spreadmoves)
+
 class MonteCarloStrategy(ParentStrategy):
     """
     Strategy that uses Monte Carlo Tree Search to determine next move.
@@ -241,9 +247,12 @@ class MonteCarloStrategy(ParentStrategy):
         Return the next action to take.
         """
         # Create a new MonteCarloTree object.
-        tree = MonteCarloTree(boardSt, self._color, **referee)
+        start_time = time.time()
+        copyBoard = boardSt.copy()
+        tree = MonteCarloTree(copyBoard, self._color, **referee)
         # Run the Monte Carlo Tree Search algorithm.
-        while referee['time_left']() < 343 - (boardSt.depth * TIME_TURN_CONSTANT):
+        # Keep running the tree until the allocated time for the turn is up
+        while time.time() - start_time < TIME_TURN_CONSTANT:
             tree.run()
         # Return the best move.
         return tree.get_best_move()
@@ -285,44 +294,89 @@ class MonteCarloTree:
             return node
         # If the node is not a leaf node, select a child node to expand.
         else:
-            return self.select_node(self.best_child(node))
+            return self.select_node(node.get_best_child_selection())
     
     def simulate(self, node):
         """
         Simulate a game from the expanded node.
         """
         # Create a copy of the boardstate.
-        boardSt = node.boardSt.copy()
+        copyBoard = node.boardSt.copy()
+
         # While the game is not over, make a random move.
-        while not boardSt.check_if_win(self.color, boardSt.board):
-            if boardSt.get_total_power(boardSt.board) <= 1:
-                coords_to_potentially_spawn_a_tile = boardSt.get_spawnmoves()
-                boardSt.board = boardSt.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
+        turncount = 0
+        while not copyBoard.check_if_win(self.color, copyBoard.board) and not copyBoard.check_if_loss(self.color, copyBoard.board) and copyBoard.depth < 170 or turncount == 0:
+            # Rotate between player's turn and opponent's turn.
+            if turncount % 2 == 0:
+                if copyBoard.get_my_power(copyBoard.board) < 1 and copyBoard.get_total_power(copyBoard.board) < 48:
+                    coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
+                    copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
+                else:
+                    if (random.randint(0,2) == 0) and (copyBoard.get_total_power(copyBoard.board) < 48):
+                        coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
+                        copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
+                    else:
+                        potential_spreadmoves = copyBoard.get_spreadmoves(self.color)
+                        copyBoard.board = copyBoard.get_new_boardstate(random.choice(potential_spreadmoves), self.color)
+            # Opponent's turn.
             else:
-                potential_spreadmoves = boardSt.get_spreadmoves(self.color)
-                boardSt.board = boardSt.get_new_boardstate(random.choice(potential_spreadmoves), self.color)
-            boardSt.depth += 1
-        # Return the result of the game.
-        return boardSt.check_if_win(self.color, boardSt.board)
+                if copyBoard.get_opp_power(self.color, copyBoard.board) < 1 and copyBoard.get_total_power(copyBoard.board) < 48:
+                    coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
+                    copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color.opponent)
+                else:
+                    if (random.randint(0,2) == 0) and (copyBoard.get_total_power(copyBoard.board) < 48) :
+                        coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
+                        copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color.opponent)
+                    else:
+                        potential_spreadmoves = copyBoard.get_spreadmoves(self.color.opponent)
+                        copyBoard.board = copyBoard.get_new_boardstate(random.choice(potential_spreadmoves), self.color.opponent)
+            copyBoard.depth += 1
+            turncount += 1
+
+        # Return the result of the game, or if end state not reached, return the result of the heuristic.
+        if copyBoard.check_if_win(self.color, copyBoard.board):# or copyBoard.get_my_power(copyBoard.board) > copyBoard.get_opp_power(self.color, copyBoard.board):
+            #print("win")
+            return True
+        else:
+            #print("loss")
+            return False
+    
+    def get_best_move(self):
+        """
+        Return the best move.
+        """
+        # If the root node has no children, return None.
+        if len(self.root.children) == 0:
+            return None
+        # Otherwise, return the action corresponding to the child node with the highest win rate.
+        else:
+            #for child in self.root.children:
+                #print(f"child: {child.action}")
+                #print(f"child.wins: {child.wins}")
+                #print(f"child.visits: {child.visits}")
+            best_child = self.root.get_best_child()
+            return best_child.action
     
     def backpropagate(self, node, result):
         """
         Backpropagate the result of the simulated game.
         """
+        node.update(result)
+
         # If the node is not the root node, update the node's win and visit counts.
         if node.parent is not None:
-            node.update(result)
             self.backpropagate(node.parent, result)
+            
     
 class Node:
     """
     A node in the Monte Carlo Tree Search algorithm.
     """
-    def __init__(self, boardSt, color, parent, action):
+    def __init__(self, boardSt: BoardState, color, parent, action):
         """
         Initialize the Node object.
         """
-        self.boardSt = boardSt
+        self.boardSt = boardSt.copy()
         self.color = color
         self.parent = parent
         self.action = action
@@ -336,20 +390,15 @@ class Node:
         """
         # If the node is a leaf node, expand it.
         if self.is_leaf():
-            # If the node is not the root node, make a random move.
-            if self.parent is not None:
-                if self.boardSt.get_total_power(self.boardSt.board) <= 1:
-                    coords_to_potentially_spawn_a_tile = self.boardSt.get_spawnmoves()
-                    self.boardSt.board = self.boardSt.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
-                else:
-                    potential_spreadmoves = self.boardSt.get_spreadmoves(self.color)
-                    self.boardSt.board = self.boardSt.get_new_boardstate(random.choice(potential_spreadmoves), self.color)
-                self.boardSt.depth += 1
             # Create a child node for each possible move.
+            if self.boardSt.get_total_power(self.boardSt.board) > 48:
+                print(self.boardSt.get_spawnmoves())
+                
             for action in self.boardSt.get_spawnmoves():
                 self.children.append(Node(self.boardSt, self.color, self, action))
             for action in self.boardSt.get_spreadmoves(self.color):
                 self.children.append(Node(self.boardSt, self.color, self, action))
+            self.boardSt.depth += 1
         # If the node is not a leaf node, do nothing.
         else:
             pass
@@ -371,21 +420,50 @@ class Node:
         """
         Return the node's UCB1 value.
         """
-        return self.wins / self.visits + 1.414 * math.sqrt(math.log(self.parent.visits) / self.visits)
+        if (self.visits == 0):
+            return 0
+        else:
+            return self.wins / self.visits + 1.414 * math.sqrt(math.log(self.parent.visits) / self.visits)
+        
+    def get_ucb2(self):
+        """
+        Altered UCB value. Removed exploration term.
+        """
+        if (self.visits == 0):
+            return 0
+        else:
+            return self.wins / self.visits
     
     def get_best_child(self):
         """
-        Return the node's best child node.
+        Return the node's best child node. This is for use when choosing the best move.
         """
         # Initialize the best child node.
         best_child = None
         # Iterate through the node's children.
         for child in self.children:
             # If the child node is the best child node, update the best child node.
-            if best_child is None or child.get_ucb() > best_child.get_ucb():
+            if best_child is None or child.get_ucb2() > best_child.get_ucb2():
                 best_child = child
         # Return the best child node.
         return best_child
     
+    def get_best_child_selection(self):
+        """
+        Return the node's best child node. This is for use when selecting a node to expand.
+        Differs from get_best_child() in that it prioritises unexplored nodes.
+        """
+        # Initialize the best child node.
+        best_child = None
+        # Iterate through the node's children.
+        for child in self.children:
+            # If the child node is unexplored, return it.
+            if child.visits == 0:
+                return child
+            # If the child node is the best child node, update the best child node.
+            elif best_child is None or child.get_ucb() > best_child.get_ucb():
+                best_child = child
+        # Return the best child node.
+        return best_child
 
     

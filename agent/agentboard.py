@@ -29,6 +29,9 @@ class BoardState:
     def get_spawnmoves(self):
         '''Return a list of all possible spawnmoves from the current board state'''
         spawnmoves = []
+        if self.get_total_power(self.board) >= 48:
+            return spawnmoves
+        
         for coord in self.grid_coords:
             if coord not in self.board:
                 spawnmoves.append(SpawnAction(HexPos(coord[0], coord[1])))
@@ -85,6 +88,12 @@ class BoardState:
     def check_if_win(self, myColor, board):
         '''Check if the given board is a winning board'''
         if self.get_opp_power(myColor, board) == 0:
+            return True
+        return False
+    
+    def check_if_loss(self, myColor, board):
+        '''Check if the given board is a losing board'''
+        if self.get_my_power(board) == 0:
             return True
         return False
 
