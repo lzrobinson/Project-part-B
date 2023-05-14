@@ -25,7 +25,7 @@ class Agent:
         self._color = color
         
         # Initialise the strategy. This will be the only line you need to change for child Agents.
-        self.strategy = OneMoveStrategy2(color, **referee)
+        self.strategy = OneMoveStrategy2(color)
 
         # Initialise the board
         self.board = BoardState({}, [], 0, self._color)
@@ -35,7 +35,7 @@ class Agent:
         """
         Return the next action to take.
         """
-        action = self.strategy.action(self.board, **referee)
+        action = self.strategy.action(self.board)
         return action
 
     def turn(self, color: PlayerColor, action: Action, **referee: dict):
@@ -58,7 +58,7 @@ class OneMoveAgent(Agent):
         super().__init__(color, **referee)
 
         # Initialise the strategy
-        self.strategy = OneMoveStrategy2(color, **referee)
+        self.strategy = OneMoveStrategy2(color)
 
 class TwoMoveAgent(Agent):
     """ 

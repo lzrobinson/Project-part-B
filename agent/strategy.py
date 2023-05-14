@@ -69,7 +69,7 @@ class OneMoveStrategy2(ParentStrategy):
     A strategy that makes a move with no look-ahead. Makes the move with the best immediate outcome.
     Different from OneMoveStrategy in that it will prioritise decreasing opponent power, not just increasing net gain.
     """
-    def action(self, boardSt: BoardState, **referee: dict) -> Action:
+    def action(self, boardSt: BoardState) -> Action:
         """
         Return the next action to take.
         """
@@ -123,10 +123,10 @@ class TwoMoveStrategy(ParentStrategy):
         best_opp_move = None
 
         # Create a new OneMoveStrategy object to predict opponent's move.
-        opp_strategy = OneMoveStrategy2(self._color.opponent, **referee)
+        opp_strategy = OneMoveStrategy2(self._color.opponent)
 
         # Create a new OneMoveStrategy object to find the best move after the opponent's predicted move.
-        next_turn_strategy = OneMoveStrategy2(self._color, **referee)
+        next_turn_strategy = OneMoveStrategy2(self._color)
 
         # Iterate through all possible moves. Find the move with the highest net gain after the opponent's move.
         for spread in boardSt.get_spreadmoves(self._color):
@@ -253,7 +253,7 @@ class MonteCarloStrategy(ParentStrategy):
         # Run the Monte Carlo Tree Search algorithm.
         # Keep running the tree until the allocated time for the turn is up
         while time.time() - start_time < TIME_TURN_CONSTANT:
-            tree.run()
+            tree.run2()
         # Return the best move.
         return tree.get_best_move()
 
@@ -261,13 +261,12 @@ class MonteCarloTree:
     """
     A Monte Carlo Tree Search algorithm to find the best move to make.
     """
-    def __init__(self, boardSt, color, **referee):
+    def __init__(self, boardSt, color, **referee: dict):
         """
         Initialize the MonteCarloTree object.
         """
         self.boardSt = boardSt
         self.color = color
-        self.referee = referee
         self.root = Node(boardSt, color, None, None)
         self.root.expand()
         self.best_move = None
@@ -280,7 +279,25 @@ class MonteCarloTree:
         node = self.select_node(self.root)
         # Expand the node.
         node.expand()
+        
         # Simulate a game from the expanded node.
+        result = self.simulate(node)
+        # Backpropagate the result of the simulated game.
+        self.backpropagate(node, result)
+    
+    def run2(self):
+        """
+        Run the Monte Carlo Tree Search algorithm.
+        """
+        # Expand root.
+        node = self.root
+        # Expand the node.
+        node.expand()
+        
+        # Select a child node to simulate from.
+        node = self.select_node(node)
+
+        # Simulate a game from the child node.
         result = self.simulate(node)
         # Backpropagate the result of the simulated game.
         self.backpropagate(node, result)
@@ -305,10 +322,10 @@ class MonteCarloTree:
 
         # While the game is not over, make a random move.
         turncount = 0
-        while not copyBoard.check_if_win(self.color, copyBoard.board) and not copyBoard.check_if_loss(self.color, copyBoard.board) and copyBoard.depth < 170 or turncount == 0:
+        while not copyBoard.check_if_win(self.color, copyBoard.board) and not copyBoard.check_if_loss(self.color, copyBoard.board) and copyBoard.depth < 10 or turncount == 0:
             # Rotate between player's turn and opponent's turn.
             if turncount % 2 == 0:
-                if copyBoard.get_my_power(copyBoard.board) < 1 and copyBoard.get_total_power(copyBoard.board) < 48:
+                if copyBoard.get_my_power(copyBoard.board) < 1:
                     coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
                     copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color)
                 else:
@@ -320,7 +337,7 @@ class MonteCarloTree:
                         copyBoard.board = copyBoard.get_new_boardstate(random.choice(potential_spreadmoves), self.color)
             # Opponent's turn.
             else:
-                if copyBoard.get_opp_power(self.color, copyBoard.board) < 1 and copyBoard.get_total_power(copyBoard.board) < 48:
+                if copyBoard.get_opp_power(self.color, copyBoard.board) < 1:
                     coords_to_potentially_spawn_a_tile = copyBoard.get_spawnmoves()
                     copyBoard.board = copyBoard.get_new_boardstate(random.choice(coords_to_potentially_spawn_a_tile), self.color.opponent)
                 else:
@@ -333,13 +350,25 @@ class MonteCarloTree:
             copyBoard.depth += 1
             turncount += 1
 
+        net_diff = node.boardSt.get_opp_power(self.color, copyBoard.board) - copyBoard.get_opp_power(self.color, copyBoard.board)
+
         # Return the result of the game, or if end state not reached, return the result of the heuristic.
-        if copyBoard.check_if_win(self.color, copyBoard.board):# or copyBoard.get_my_power(copyBoard.board) > copyBoard.get_opp_power(self.color, copyBoard.board):
+        if copyBoard.check_if_win(self.color, copyBoard.board):
             #print("win")
-            return True
+            return 1/copyBoard.depth
+
+        # If the opposition power is less than the root board
+        elif net_diff > 0:
+            #print("win")
+            return net_diff/(copyBoard.depth**2)
+
+        elif copyBoard.get_my_power(copyBoard.board) == copyBoard.get_opp_power(self.color, copyBoard.board):
+            #print("tie")
+            return 0
+
         else:
             #print("loss")
-            return False
+            return -1/(copyBoard.depth**0.5)
     
     def get_best_move(self):
         """
@@ -350,10 +379,9 @@ class MonteCarloTree:
             return None
         # Otherwise, return the action corresponding to the child node with the highest win rate.
         else:
-            #for child in self.root.children:
-                #print(f"child: {child.action}")
-                #print(f"child.wins: {child.wins}")
-                #print(f"child.visits: {child.visits}")
+            for child in self.root.children:
+                print(f"child: {child.action} |child.wins: {child.wins} |child.visits: {child.visits}")
+
             best_child = self.root.get_best_child()
             return best_child.action
     
@@ -366,6 +394,12 @@ class MonteCarloTree:
         # If the node is not the root node, update the node's win and visit counts.
         if node.parent is not None:
             self.backpropagate(node.parent, result)
+
+    def get_appropriate_depth(self):
+        """
+        Return the appropriate depth to search to. This is inversely proportional to the number of moves made.
+        """
+        return 100 - (len(self.boardSt.history))/4
             
     
 class Node:
@@ -395,9 +429,13 @@ class Node:
                 print(self.boardSt.get_spawnmoves())
                 
             for action in self.boardSt.get_spawnmoves():
-                self.children.append(Node(self.boardSt, self.color, self, action))
+                copyBoard = self.boardSt.copy()
+                copyBoard.board = copyBoard.get_new_boardstate(action, self.color)
+                self.children.append(Node(copyBoard, self.color, self, action))
             for action in self.boardSt.get_spreadmoves(self.color):
-                self.children.append(Node(self.boardSt, self.color, self, action))
+                copyBoard = self.boardSt.copy()
+                copyBoard.board = copyBoard.get_new_boardstate(action, self.color)
+                self.children.append(Node(copyBoard, self.color, self, action))
             self.boardSt.depth += 1
         # If the node is not a leaf node, do nothing.
         else:
@@ -423,7 +461,7 @@ class Node:
         if (self.visits == 0):
             return 0
         else:
-            return self.wins / self.visits + 1.414 * math.sqrt(math.log(self.parent.visits) / self.visits)
+            return (self.wins / self.visits) + (1.414 * math.sqrt(math.log(self.parent.visits)) / self.visits)
         
     def get_ucb2(self):
         """
@@ -467,3 +505,33 @@ class Node:
         return best_child
 
     
+class MonteCarloTree2(MonteCarloTree):
+    def simulate(self, node):
+        """
+        Simulate a game from the expanded node.
+        """
+        # Create a copy of the boardstate.
+        copyBoard = node.boardSt.copy()
+
+        player_sim = OneMoveStrategy2(self.color)
+        opponent_sim = OneMoveStrategy2(self.color.opponent)
+
+        # While the game is not over, make a random move.
+        turncount = 0
+        while not copyBoard.check_if_win(self.color, copyBoard.board) and not copyBoard.check_if_loss(self.color, copyBoard.board) and copyBoard.depth < 170 or turncount == 0:
+            # Rotate between player's turn and opponent's turn.
+            if turncount % 2 == 0:
+                copyBoard.board = copyBoard.get_new_boardstate(player_sim.action(copyBoard), self.color)
+            # Opponent's turn.
+            else:
+                copyBoard.board = copyBoard.get_new_boardstate(opponent_sim.action(copyBoard), self.color.opponent)
+            copyBoard.depth += 1
+            turncount += 1
+
+        # Return the result of the game, or if end state not reached, return the result of the heuristic.
+        if copyBoard.check_if_win(self.color, copyBoard.board):# or copyBoard.get_my_power(copyBoard.board) > copyBoard.get_opp_power(self.color, copyBoard.board):
+            #print("win")
+            return True
+        else:
+            #print("loss")
+            return False
